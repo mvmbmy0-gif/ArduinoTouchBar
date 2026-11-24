@@ -1,11 +1,9 @@
 <div align="center">
 
-# 🇺🇦 Проєкт розроблений українцем / Project developed by a Ukrainian 🇺🇦
-
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-no-action.svg)](https://stand-with-ukraine.pp.ua)
 
 <p align="center">
-  <img src="pictures/arduino_main.png" alt="Arduino TouchBar Main" width="960">
+  <img src="pictures/arduino_hero.png" alt="Arduino TouchBar Full Showcase" width="100%">
 </p>
 
 # MacBook Pro Touch Bar for Arduino IDE
@@ -23,11 +21,11 @@
 
 ## 📸 Screenshots / Знімки екрана
 
-| State / Стан | Touch Bar Screenshot |
-|---|---|
-| **Main Bar** (Verify, Upload, Serial Monitor, Sketches, Libraries) | <img src="pictures/arduino_main.png" width="900" alt="Arduino Main"> |
-| **Multi-Sketch Window Switcher** (Interactive sketch list) | <img src="pictures/arduino_windows.png" width="900" alt="Arduino Window Switcher"> |
-| **Control Strip Companion** (Direct tray icon toggle) | <img src="pictures/arduino_control_strip.png" width="900" alt="Control Strip Tray Icon"> |
+| Mode / Стан | Touch Bar Preview |
+| :--- | :--- |
+| **Main Bar**<br>Головна панель (Verify, Upload, Monitor) | <img src="pictures/arduino_main_card.png" width="100%" alt="Main Bar"> |
+| **Window Switcher**<br>Вибір скетчу | <img src="pictures/arduino_windows_card.png" width="100%" alt="Window Switcher"> |
+| **Control Strip**<br>Іконка в треї | <img src="pictures/arduino_strip_card.png" width="100%" alt="Control Strip"> |
 
 ---
 
