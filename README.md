@@ -2,10 +2,6 @@
 
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-no-action.svg)](https://stand-with-ukraine.pp.ua)
 
-<p align="center">
-  <img src="pictures/arduino_hero.png" alt="Arduino TouchBar Full Showcase" width="100%">
-</p>
-
 # MacBook Pro Touch Bar for Arduino IDE
 ### ⚡ Compile, Upload, Serial Monitor, Libraries & Multi-Sketch Switcher
 
@@ -26,6 +22,10 @@
 | **Main Bar**<br>Головна панель (Verify, Upload, Monitor) | <img src="pictures/arduino_main_card.png" width="100%" alt="Main Bar"> |
 | **Window Switcher**<br>Вибір скетчу | <img src="pictures/arduino_windows_card.png" width="100%" alt="Window Switcher"> |
 | **Control Strip**<br>Іконка в треї | <img src="pictures/arduino_strip_card.png" width="100%" alt="Control Strip"> |
+
+<p align="center">
+  <img src="pictures/arduino_hero.png" alt="TouchBar Full Showcase" width="100%">
+</p>
 
 ---
 
