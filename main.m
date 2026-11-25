@@ -2,54 +2,6 @@
 #import <Carbon/Carbon.h>
 #import <ApplicationServices/ApplicationServices.h>
 
-// ==============================================================================
-//  LANGUAGE / LOCALIZATION CONFIGURATION
-//  ------------------------------------------------------------------------------
-//  - Set FORCE_LANGUAGE to nil for automatic system language detection (en/uk),
-//    or explicitly set to @"en", @"uk", @"es", @"de", etc.
-//  - To add a new language, simply add a new key dictionary to kI18n below!
-// ==============================================================================
-
-#define FORCE_LANGUAGE nil
-
-static NSDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *kI18n = @{
-    @"en": @{
-        @"verify":          @"Verify",
-        @"upload":          @"Upload",
-        @"serial":          @"Monitor",
-        @"sketches":        @"Sketches",
-        @"libraries":       @"Libraries",
-        @"sketch_fallback": @"Sketch",
-        @"menu_toggle":     @"Show / Hide Arduino Bar",
-        @"menu_quit":       @"Quit ArduinoTouchBar"
-    },
-    @"uk": @{
-        @"verify":          @"Перевірити",
-        @"upload":          @"Зашити",
-        @"serial":          @"Монітор",
-        @"sketches":        @"Скетчі",
-        @"libraries":       @"Бібліотеки",
-        @"sketch_fallback": @"Скетч",
-        @"menu_toggle":     @"Показати / Сховати панель Arduino",
-        @"menu_quit":       @"Вийти з ArduinoTouchBar"
-    }
-};
-
-static NSString *Localized(NSString *key) {
-    NSString *lang = FORCE_LANGUAGE;
-    if (!lang) {
-        NSString *preferred = [NSLocale preferredLanguages].firstObject ?: @"en";
-        if ([preferred hasPrefix:@"uk"]) {
-            lang = @"uk";
-        } else {
-            lang = @"en";
-        }
-    }
-    NSDictionary *dict = kI18n[lang] ?: kI18n[@"en"];
-    return dict[key] ?: kI18n[@"en"][key] ?: key;
-}
-
-// --- Private Touch Bar and DFR APIs ---
 @interface NSTouchBarItem (Private)
 + (void)addSystemTrayItem:(NSTouchBarItem *)item;
 @end
@@ -124,7 +76,7 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
     [trayBtn setButtonType:NSButtonTypeMomentaryChange];
     trayBtn.bordered = NO;
     trayBtn.wantsLayer = YES;
-    // Native Control Strip dark tint (#3B3B3D) and standard 38pt width
+    // Точний баланс між 55/255 та 74/255 -> 63/255 (#3F3F41) у Display P3 + ширина 38pt як у сусідніх кнопок
     trayBtn.layer.backgroundColor = [NSColor colorWithDisplayP3Red:54.5/255.0 green:54.5/255.0 blue:55.0/255.0 alpha:1.0].CGColor;
     trayBtn.layer.cornerRadius = 0.0;
     [trayBtn.widthAnchor constraintEqualToConstant:38].active = YES;
@@ -154,9 +106,9 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
         self.statusItem.button.title = @"ArduinoBar";
     }
     NSMenu *menu = [[NSMenu alloc] init];
-    [menu addItemWithTitle:Localized(@"menu_toggle") action:@selector(toggleBar:) keyEquivalent:@"a"];
+    [menu addItemWithTitle:@"Показати / Сховати панель Arduino" action:@selector(toggleBar:) keyEquivalent:@"a"];
     [menu addItem:[NSMenuItem separatorItem]];
-    [menu addItemWithTitle:Localized(@"menu_quit") action:@selector(terminate:) keyEquivalent:@"q"];
+    [menu addItemWithTitle:@"Вийти з ArduinoTouchBar" action:@selector(terminate:) keyEquivalent:@"q"];
     self.statusItem.menu = menu;
 
     DFRSystemModalShowsCloseBoxWhenFrontMost(YES);
@@ -183,10 +135,11 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
     self.arduinoTouchBar.defaultItemIdentifiers = self.mainIdentifiers;
 
     [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
-                                                           selector:@selector(checkFrontApp)
+                                                           selector:@selector(activeAppChanged:)
                                                                name:NSWorkspaceDidActivateApplicationNotification
                                                              object:nil];
 
+    [self checkFrontApp];
     self.windowPollTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
                                                             target:self
                                                           selector:@selector(refreshArduinoWindows)
@@ -206,7 +159,7 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
 }
 
 - (NSString *)formatWindowTitle:(NSString *)rawTitle {
-    NSString *clean = rawTitle ?: Localized(@"sketch_fallback");
+    NSString *clean = rawTitle ?: @"Скетч";
     NSArray *seps = @[@" — Arduino IDE", @" - Arduino IDE", @" | Arduino IDE"];
     for (NSString *sep in seps) {
         NSRange r = [clean rangeOfString:sep];
@@ -215,8 +168,10 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
             break;
         }
     }
-    clean = [clean stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-    return clean.length > 0 ? clean : Localized(@"sketch_fallback");
+    if (clean.length > 24) {
+        clean = [[clean substringToIndex:23] stringByAppendingString:@"…"];
+    }
+    return clean;
 }
 
 - (void)refreshArduinoWindows {
@@ -233,45 +188,37 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
         if ([bid isEqualToString:@"com.local.ArduinoTouchBar"]) continue;
 
         AXUIElementRef appRef = AXUIElementCreateApplication(app.processIdentifier);
-        if (!appRef) continue;
-
         CFArrayRef winList = NULL;
-        if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, (CFTypeRef *)&winList) == kAXErrorSuccess && winList) {
+        if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, (CFTypeRef *)&winList) == kAXErrorSuccess && winList != NULL) {
             CFIndex count = CFArrayGetCount(winList);
             for (CFIndex i = 0; i < count; i++) {
                 AXUIElementRef winRef = (AXUIElementRef)CFArrayGetValueAtIndex(winList, i);
                 CFTypeRef titleRef = NULL;
                 AXUIElementCopyAttributeValue(winRef, kAXTitleAttribute, &titleRef);
-                NSString *title = titleRef ? (__bridge_transfer NSString *)titleRef : @"";
+                NSString *rawTitle = titleRef ? (__bridge_transfer NSString *)titleRef : @"";
+                if (rawTitle.length == 0) continue;
 
-                CFTypeRef roleRef = NULL;
-                AXUIElementCopyAttributeValue(winRef, kAXRoleAttribute, &roleRef);
-                NSString *role = roleRef ? (__bridge_transfer NSString *)roleRef : @"";
-
-                if ([role isEqualToString:(__bridge NSString *)kAXWindowRole] || role.length == 0) {
-                    if (title.length > 0) {
-                        NSString *formatted = [self formatWindowTitle:title];
-                        [found addObject:@{
-                            @"title": formatted,
-                            @"rawTitle": title,
-                            @"pid": @(app.processIdentifier)
-                        }];
-                    }
-                }
+                [found addObject:@{
+                    @"title": [self formatWindowTitle:rawTitle],
+                    @"rawTitle": rawTitle,
+                    @"pid": @(app.processIdentifier)
+                }];
             }
             CFRelease(winList);
         }
         CFRelease(appRef);
     }
 
-    self.openWindows = [found copy];
+    BOOL countChanged = ((self.openWindows.count > 1) != (found.count > 1));
+    self.openWindows = found;
 
-    if (!self.isShowingWindows) {
-        NSArray *desired = (self.openWindows.count > 1) ? self.mainIdentifiersWithWindows : self.mainIdentifiers;
-        if (![self.arduinoTouchBar.defaultItemIdentifiers isEqualToArray:desired]) {
-            self.arduinoTouchBar.defaultItemIdentifiers = desired;
-        }
+    if (self.isBarVisible && !self.isShowingWindows && countChanged) {
+        self.arduinoTouchBar.defaultItemIdentifiers = (self.openWindows.count > 1) ? self.mainIdentifiersWithWindows : self.mainIdentifiers;
     }
+}
+
+- (void)activeAppChanged:(NSNotification *)note {
+    [self checkFrontApp];
 }
 
 - (void)checkFrontApp {
@@ -284,16 +231,7 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
             [self showBar];
         }
     } else {
-        if (self.isTrayVisible && self.currentTrayId) {
-            DFRElementSetControlStripPresenceForIdentifier(self.currentTrayId, NO);
-            self.isTrayVisible = NO;
-        }
-        if (self.isBarVisible) {
-            [NSTouchBar dismissSystemModalTouchBar:self.arduinoTouchBar];
-            self.isBarVisible = NO;
-            self.isShowingWindows = NO;
-        }
-        self.userDismissedManually = NO;
+        [self hideBar];
     }
 }
 
@@ -305,6 +243,20 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
     self.arduinoTouchBar.defaultItemIdentifiers = (self.openWindows.count > 1) ? self.mainIdentifiersWithWindows : self.mainIdentifiers;
     [NSTouchBar presentSystemModalTouchBar:self.arduinoTouchBar systemTrayItemIdentifier:self.currentTrayId];
     self.isBarVisible = YES;
+    self.userDismissedManually = NO;
+}
+
+- (void)hideBar {
+    if (self.isBarVisible) {
+        [NSTouchBar dismissSystemModalTouchBar:self.arduinoTouchBar];
+        self.isBarVisible = NO;
+        self.isShowingWindows = NO;
+        self.arduinoTouchBar.defaultItemIdentifiers = self.mainIdentifiers;
+    }
+    if (self.isTrayVisible && self.currentTrayId) {
+        DFRElementSetControlStripPresenceForIdentifier(self.currentTrayId, NO);
+        self.isTrayVisible = NO;
+    }
     self.userDismissedManually = NO;
 }
 
@@ -323,10 +275,9 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
     [self refreshArduinoWindows];
     if (self.openWindows.count <= 1) return;
     self.isShowingWindows = YES;
-
     NSMutableArray *ids = [NSMutableArray arrayWithObject:@"com.local.ino.back"];
-    for (NSInteger i = 0; i < (NSInteger)self.openWindows.count; i++) {
-        [ids addObject:[NSString stringWithFormat:@"com.local.ino.win.%ld", (long)i]];
+    for (NSUInteger i = 0; i < MIN(self.openWindows.count, 5); i++) {
+        [ids addObject:[NSString stringWithFormat:@"com.local.ino.win.%lu", (unsigned long)i]];
     }
     self.arduinoTouchBar.defaultItemIdentifiers = ids;
 }
@@ -338,14 +289,16 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
 
 - (void)raiseWindow:(NSButton *)sender {
     NSInteger pos = sender.tag;
-    if (pos >= 0 && pos < (NSInteger)self.openWindows.count) {
-        NSDictionary *info = self.openWindows[pos];
-        pid_t pid = [info[@"pid"] intValue];
-        NSString *targetRaw = info[@"rawTitle"];
+    if (pos < 0 || pos >= (NSInteger)self.openWindows.count) return;
 
+    NSDictionary *info = self.openWindows[pos];
+    pid_t pid = [info[@"pid"] intValue];
+    NSString *targetRaw = info[@"rawTitle"] ?: @"";
+
+    if (pid > 0 && AXIsProcessTrusted()) {
         AXUIElementRef appRef = AXUIElementCreateApplication(pid);
         CFArrayRef winList = NULL;
-        if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, (CFTypeRef *)&winList) == kAXErrorSuccess && winList) {
+        if (AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute, (CFTypeRef *)&winList) == kAXErrorSuccess && winList != NULL) {
             CFIndex count = CFArrayGetCount(winList);
             for (CFIndex i = 0; i < count; i++) {
                 AXUIElementRef winRef = (AXUIElementRef)CFArrayGetValueAtIndex(winList, i);
@@ -410,15 +363,15 @@ extern void DFRSystemModalShowsCloseBoxWhenFrontMost(BOOL shows);
     NSButton *btn = nil;
 
     if ([identifier isEqualToString:@"com.local.ino.verify"]) {
-        btn = [self makeSymbolButton:@"checkmark.circle" title:Localized(@"verify") action:@selector(doVerify:)];
+        btn = [self makeSymbolButton:@"checkmark.circle" title:@"Перевірити" action:@selector(doVerify:)];
     } else if ([identifier isEqualToString:@"com.local.ino.upload"]) {
-        btn = [self makeSymbolButton:@"arrow.right.circle" title:Localized(@"upload") action:@selector(doUpload:)];
+        btn = [self makeSymbolButton:@"arrow.right.circle" title:@"Зашити" action:@selector(doUpload:)];
     } else if ([identifier isEqualToString:@"com.local.ino.serial"]) {
-        btn = [self makeSymbolButton:@"terminal" title:Localized(@"serial") action:@selector(doSerial:)];
+        btn = [self makeSymbolButton:@"terminal" title:@"Монітор" action:@selector(doSerial:)];
     } else if ([identifier isEqualToString:@"com.local.ino.sketchbook"]) {
-        btn = [self makeSymbolButton:@"folder" title:Localized(@"sketches") action:@selector(doSketchbook:)];
+        btn = [self makeSymbolButton:@"folder" title:@"Скетчі" action:@selector(doSketchbook:)];
     } else if ([identifier isEqualToString:@"com.local.ino.libs"]) {
-        btn = [self makeSymbolButton:@"books.vertical" title:Localized(@"libraries") action:@selector(doLibs:)];
+        btn = [self makeSymbolButton:@"books.vertical" title:@"Бібліотеки" action:@selector(doLibs:)];
     } else if ([identifier isEqualToString:@"com.local.ino.windows"]) {
         btn = [self makeSymbolButton:@"macwindow.on.rectangle" title:@"" action:@selector(openWindowsMenu:)];
         [btn.widthAnchor constraintEqualToConstant:48].active = YES;
